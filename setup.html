@@ -11,7 +11,7 @@
 		  	width: 300px;
 		  }
 		  textarea {
-		  	width: 700px;
+		  	width: 1000px;
 		  	height: 10em;
 		  }
 		</style>
@@ -26,24 +26,31 @@
 	<hr>
 	
 	<p>
-		This is a simple addon for HipChat that allows users to post random demotivators with "/demotivator foo".  
-		It searches the Google Image Search API for `foo` and posts the first image found to the room. 
+		This is a simple addon for HipChat that allows users to post random demotivators with "/demotivator foo".<br>  
+		It searches the Google Image Search API for `foo` and posts the first image found to the room. <br>
+		You are not limited to "demotivator" -- you can use any trigger string you like!
 	</p>
 	
 	<p>
-		To get started you'll need to set up a webhook with HipChat.  The callback URL has been prefilled based on 
-		the current URL for this browser window.
+		If you're new here, you'll need an API token from Hipchat.  You can get one at https://XXX.hipchat.com/account/api, where XXX is your Hipchat subdomain.<br>
+		Below you can install webhooks for any trigger string you like.  If you have not modified the tool, your webhook URL will be 
+		 <a href='webhook-endpoint.php'>webhook-endpoint.php</a> on this same server.<br>
 		If you are running this file on localhost, you probably want to set up a <a href='http://requestb.in'>requestb.in</a> 
-		or similar and paste the data into <a href='debug.php'>debug.php</a> instead.
+		 or similar and paste the data into the debug box below instead.
 	</p>
 	<input id='token' placeholder='Token'> Token<br>
-	<input id='webhookurl' value='http://requestb.in/1f3ncog1'> Webhook URL<br>
-	<input id='room' value='Theswish'> Room<br>
+	<input id='room' value='Theswish'> Room (case sensitive)<br>
+
+	<hr>
+
+	Add a webhook<br>
+	<input id='triggerstring' value='demotivator'> Trigger String<br>
+	<input id='webhookurl' value=''> Webhook URL<br>
 	<button id='addwebhook' name='addwebhook'>Add Webhook</button>
 	
 	<br><br>
 	Get current webhooks<br>
-	<textarea id='currenthooks' readonly></textarea><br>
+	<textarea id='currenthooks' readonly>(Enter token above and click "Get current webhooks" below)</textarea><br>
 	<button id='getcurrenthooks' name='getcurrenthooks'>Get current webhooks</button>
 	
 	<br><br>
@@ -51,11 +58,31 @@
 	<input id='deleteid' placeholder='ID'> ID<br>
 	<button id='deletehook' name='deletehook'>Delete webhook</button>
 	
+	<hr>
+	Debug<br>
+	Faint of heart, turn back now.  If you wish to debug this awesome system, here's what to do.
+	<ol>
+		<li>Start on localhost</li>
+		<li>Get yourself a bin from requestb.in</li>
+		<li>Add a webhook above using your bin</li>
+		<li>Post something in Hipchat that you think should trigger the webhook</li>
+		<li>Refresh your bin.  Copy the token into the token field above, and the json data into the box here.</li>
+		<li>Open your browser tools and click Debug.</li>
+		<li>If things are working you will see a highly relevant image posted to the chat room.</li>
+		<li>If there is a problem with your webhook, nothing will show up in the bin when you refresh it.</li>
+		<li>If there is a problem in your webhook-endpoint.php you can see the output in the Network tab.  If everything is working properly you should see zero response.</li>
+		<li>To debug the PHP, you can send data forwards to the Hipchat, or echo it and find it in the Network tab.</li>
+		<li>Once everything is working on localhost, push to dev/prod and try again.</li>
+	</ol>
+	<textarea id='debugtext' >Paste JSON here</textarea><br>
+	<button id='debug' name='debug'>Debug</button>
+	
 	
 	<script>
 	
-		// click handlers for the buttons
+		// wait till the page is ready to add handlers to the buttons
 		$(document).ready( function() {
+			// button handlers
 			$('#addwebhook').click(function() {
 				addwebhook();
 			});
@@ -67,29 +94,34 @@
 			$('#deletehook').click(function() {
 				deletewebhook();
 			});
+			
+			$('#debug').click(function() {
+				debug();
+			});
 		});
 			
 		// add a webhook -- https://www.hipchat.com/docs/apiv2/method/create_webhook
 		function addwebhook() {
+			var trigger = $('#triggerstring').val();
 			var token = $('#token').val();
 			var baseurl = $('#webhookurl').val();
 			var room = $('#room').val();
+			
+			// TODO: make sure relevant parameters are not left blank
 
 			// add the token onto the webhook url so that it can post the images with proper credentials
-			// depending on whether baseurl already contains a '?', use an ampersand or question mark to append the token parameter 
-			url =  baseurl + ((baseurl.indexOf("?") > -1) ? "&" : "?" ) + "token="+token;
+			url = addurlparam(baseurl, "token="+token);
 
 			var param = {
 				url: url,
-				pattern: "/mot.*",
-				event: "room_message",
-				name: "hcdm-" + Math.random()
+				pattern: "/" + trigger + ".*", // message starts with /trigger
+				event: "room_message", 			// respond to room messages, not entry/exit etc
+				name: "hcdm-" + Math.random()	// events from this page are prefixed with hcdm- so we can find them later
 			};	
 			$.ajax({
 				type: "POST",
 			  	url: "https://api.hipchat.com/v2/room/"+room+"/webhook?auth_token="+token,
-				jsonp: 'callback',
-		  	  	data: JSON.stringify(param), // must be a JSON payload to add webhook
+		  	  	data: JSON.stringify(param), 	// not the usual way we do ajax -- must be a JSON payload for Hipchat
 		  	  	contentType:"application/json; charset=utf-8",
   				success: function (data) {
 					getcurrenthooks();
@@ -107,7 +139,9 @@
 			var token = $('#token').val();
 			var room = $('#room').val();
 
-			// these are optional
+			// TODO: make sure relevant parameters are not left blank
+
+			// these are optional, change if you like
 			var param = {
 				"start-index": 0,
 				"max-results": 100
@@ -116,18 +150,9 @@
 			$.ajax({
 				type: "GET",
 				url: "https://api.hipchat.com/v2/room/"+room+"/webhook?auth_token="+token,
-			  	jsonp: 'callback',
-		  	  	data: param, // must be URL encoded to get webhooks
+		  	  	data: param, 					// typical urlencoded (ie GET) params
   				success: function (data) {
-					var str = "";
-					$(data['items']).each( function() {
-						// only show HipChatDeMotivator callbacks
-						if (this['name'].slice(0, 5) == "hcdm-") {
-							line = this['id'] + " - " + this['pattern'] + " - " + this['url'] + "&#13;";
-							str += line;
-						}
-					});
-					$('#currenthooks').html(str);
+  					displayhooks(data);
 		  	  	},
 		  	  	error: function (data) {
 		  	  		console.log(data);
@@ -141,6 +166,8 @@
 			var token = $('#token').val();
 			var room = $('#room').val();
 			var hookid = $('#deleteid').val();
+
+			// TODO: make sure relevant parameters are not left blank
 
 			// request must be DELETE
 			$.ajax({
@@ -157,6 +184,49 @@
 		  	  	}
 			});
 		}
+		
+		function debug() {
+			var token = $('#token').val();
+			var debugdata = $('#debugtext').val();
+			$.ajax({
+				type: "POST",
+			  	url: "webhook-endpoint.php?token="+token,
+			  	data: debugdata, 								// simulate the JSON payload hipchat will send
+		  	  	contentType:"application/json; charset=utf-8",
+		  	  	success: function(data) {
+		  	  		
+		  	  	}
+		  	});
+		}
+		
+		// add a GET param to a url which may already have GET params
+		function addurlparam(baseurl, paramstring) {
+			// do we want to join with an & or an 
+			connector = (baseurl.indexOf("?") > -1) ? "&" : "?";
+			return baseurl + connector + paramstring;
+		}
+		
+		// success callback for ajax request to Hipchat for current hooks
+		function displayhooks(data) {
+			// data contains the current webhooks, display them by adding lines to the textarea
+			var hookshtml = "";
+			
+			// loop through all the existing hooks
+			$(data['items']).each( function() {
+				// only display hooks whose name starts with hcdm- 
+				if (this['name'].slice(0, 5) == "hcdm-") {
+					hookshtml += this['id'] + " - " + this['pattern'] + " - " + this['url'] + "&#13;"; // &#13; is a newline in a textarea in Chrome/Win at least
+				}
+			});
+			
+			// display a message if no hooks
+			if (hookshtml === "") {
+				hookshtml = "(None)";
+			}
+			
+			// use .html so that the browser parses the newlines as intended
+			$('#currenthooks').html(hookshtml);
+  	  	}
 		
 	</script>
 	
