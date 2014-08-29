@@ -27,7 +27,7 @@
 	
 	<p>
 		This is a simple addon for HipChat that allows users to post random demotivators with "/demotivator foo".<br>  
-		It searches the Google Image Search API for `foo` and posts the first image found to the room. <br>
+		It searches the Google Image Search API for `demotivator foo` and posts the first image found to the room. <br>
 		You are not limited to "demotivator" -- you can use any trigger string you like!
 	</p>
 	
@@ -114,7 +114,7 @@
 
 			var param = {
 				url: url,
-				pattern: "/" + trigger + ".*", // message starts with /trigger
+				pattern: "/" + trigger + ".*", 	// message starts with /trigger
 				event: "room_message", 			// respond to room messages, not entry/exit etc
 				name: "hcdm-" + Math.random()	// events from this page are prefixed with hcdm- so we can find them later
 			};	
