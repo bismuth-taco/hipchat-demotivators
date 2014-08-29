@@ -1,7 +1,5 @@
 <?php
 
-$CACERT_PATH = "C:/Users/Brad/Documents/GitHub/swish/swish-backend/shipping/vip_console/cacert.pem";
-
 // PHP's curious syntax for getting the POST body
 echo webhook(file_get_contents('php://input')); 
 
@@ -60,7 +58,7 @@ function curl_hipchat_post($url, $data) {
 	// api from https://www.hipchat.com/docs/apiv2/method/send_room_notification, should work with other URLs too
 	$ch = curl_init();
 	$data_string = json_encode($data);
-	curl_setopt($ch, CURLOPT_CAINFO, $CACERT_PATH);
+	setup_cacert($ch);	
 	curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 	curl_setopt($ch, CURLOPT_URL, $url);
 	curl_setopt($ch, CURLOPT_POST, 1);
@@ -76,6 +74,13 @@ function curl_hipchat_post($url, $data) {
 	
 	// errors will be fed back here
 	return $body;
+}
+
+// on the developer's computer this does not work automatically for some reason
+function setup_cacert($ch) {
+	if (strpos($_SERVER["DOCUMENT_ROOT"], 'rad') !== false) { // brad wamp
+		curl_setopt($ch, CURLOPT_CAINFO, "C:/Users/Brad/Documents/GitHub/swish/swish-backend/shipping/vip_console/cacert.pem");
+	}
 }
 
 ?>
